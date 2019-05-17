@@ -1,17 +1,24 @@
+// Service registry keeps track of all services in the network.
+//
+// It makes mDNS queries to get information about how many origins
+// and stream publishers are there in the network. And then it constructs
+// urls for the clients to access in the home page.
+//
+// The no. of urls are a n*m product
+// where n = no. of origins and,
+// m = no. of cache servers
+//
+// The client can choose to access any of these urls depending on where
+// they are located. The origin info is sent to the cache server in a
+// query string from which it knows which origin to point to.
 package main
 
 import (
-	"context"
 	"flag"
 	"log"
-	"net"
-	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
-
-	"github.com/syntaqx/serve"
 )
 
 var (
@@ -34,30 +41,8 @@ func main() {
 		port = p
 	}
 
-	fs := serve.NewFileServer(serve.Options{
-		Directory: dir,
-	})
-
-	fs.Use(
-		Logger(logger),
-		Recover(),
-		CORS(),
-	)
-
-	addr := net.JoinHostPort(host, port)
-	server := &http.Server{
-		Addr:         addr,
-		Handler:      fs,
-		ReadTimeout:  5 * time.Second,
-		WriteTimeout: 5 * time.Second,
-	}
-
-	go func() {
-		err := server.ListenAndServe()
-		if err != http.ErrServerClosed {
-			logger.Fatal(err)
-		}
-	}()
+	registry := NewRegistry(dir, host, port, logger)
+	registry.Start()
 
 	// listen for signals
 	signalCh := make(chan os.Signal, 1)
@@ -67,11 +52,6 @@ func main() {
 	// Block until one of the signals above is received
 	<-signalCh
 	logger.Println("Quit signal received, initializing shutdown...")
-	logger.Println("Stopping HTTP server")
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	err := server.Shutdown(ctx)
-	if err != nil {
-		logger.Println(err)
-	}
-	cancel()
+	logger.Println("Stopping registry")
+	registry.Stop()
 }
