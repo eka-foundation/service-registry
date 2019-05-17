@@ -15,7 +15,7 @@ import (
 )
 
 type registry struct {
-	servicesMu           sync.Mutex
+	servicesMu           sync.RWMutex
 	serviceMap           map[string][]*mdns.ServiceEntry
 	srv                  *http.Server
 	streamTmpl, homeTmpl *template.Template

@@ -22,7 +22,7 @@ func (r *registry) homeHandler(w http.ResponseWriter, req *http.Request) {
 		CacheName  string
 	}
 	ctx := []item{}
-	r.servicesMu.Lock()
+	r.servicesMu.RLock()
 	// for every origin
 	for _, oSvc := range r.serviceMap["stream_publisher._tcp"] {
 		// for every cache
@@ -37,7 +37,7 @@ func (r *registry) homeHandler(w http.ResponseWriter, req *http.Request) {
 			})
 		}
 	}
-	r.servicesMu.Unlock()
+	r.servicesMu.RUnlock()
 	err := r.homeTmpl.Execute(w, ctx)
 	if err != nil {
 		r.logger.Println(err)
