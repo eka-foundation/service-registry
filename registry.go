@@ -15,16 +15,20 @@ import (
 )
 
 type registry struct {
-	servicesMu           sync.RWMutex
-	serviceMap           map[string][]*mdns.ServiceEntry
-	srv                  *http.Server
-	streamTmpl, homeTmpl *template.Template
-	logger               *log.Logger
-	quitChan             chan struct{}
+	servicesMu          sync.RWMutex
+	serviceMap          map[string][]*mdns.ServiceEntry
+	resetServiceMapChan chan struct{} // the serviceMap will be emptied every time
+	// this signal is fired. Essentially this is done for every new query.
+	srv                     *http.Server
+	streamTmpl, homeTmpl    *template.Template
+	logger                  *log.Logger
+	queryInterval           time.Duration
+	entriesChan             chan *mdns.ServiceEntry
+	quitChan, queryDoneChan chan struct{}
 }
 
 // NewRegistry returns a new registry instance.
-func NewRegistry(dir, host, port string, logger *log.Logger) *registry {
+func NewRegistry(dir, host, port string, queryInt time.Duration, logger *log.Logger) *registry {
 	fs := serve.NewFileServer(serve.Options{
 		Directory: dir,
 		Prefix:    "/static/",
@@ -49,11 +53,15 @@ func NewRegistry(dir, host, port string, logger *log.Logger) *registry {
 			WriteTimeout: 5 * time.Second,
 			ErrorLog:     logger,
 		},
-		serviceMap: make(map[string][]*mdns.ServiceEntry),
-		streamTmpl: stmpl,
-		homeTmpl:   htmpl,
-		logger:     logger,
-		quitChan:   make(chan struct{}),
+		serviceMap:          make(map[string][]*mdns.ServiceEntry),
+		resetServiceMapChan: make(chan struct{}),
+		streamTmpl:          stmpl,
+		homeTmpl:            htmpl,
+		logger:              logger,
+		queryInterval:       queryInt,
+		entriesChan:         make(chan *mdns.ServiceEntry),
+		queryDoneChan:       make(chan struct{}),
+		quitChan:            make(chan struct{}),
 	}
 
 	mux.Handle("/static/", fs)
@@ -65,10 +73,38 @@ func NewRegistry(dir, host, port string, logger *log.Logger) *registry {
 
 // Start the registry.
 func (r *registry) Start() {
-	entriesCh := make(chan *mdns.ServiceEntry)
 	go func() {
-		// read all the service entries.
-		for entry := range entriesCh {
+		// Start the server.
+		err := r.srv.ListenAndServe()
+		if err != http.ErrServerClosed {
+			r.logger.Fatal(err)
+		}
+		// sending the quit signal.
+		r.quitChan <- struct{}{}
+	}()
+
+	go r.readServiceEntries()
+
+	r.lookupServices()
+
+	// Start the query loop
+	go r.queryLoop()
+}
+
+func (r *registry) readServiceEntries() {
+	for {
+		select {
+		case <-r.resetServiceMapChan:
+			r.servicesMu.Lock()
+			r.serviceMap["stream_publisher._tcp"] = []*mdns.ServiceEntry{}
+			r.serviceMap["proxy_cache._tcp"] = []*mdns.ServiceEntry{}
+			r.servicesMu.Unlock()
+		case entry := <-r.entriesChan:
+			// Channel is closed, so exit
+			if entry == nil {
+				return
+			}
+			// read all the service entries.
 			nameBits := strings.Split(entry.Name, ".")
 			if len(nameBits) < 4 {
 				r.logger.Printf("Service name: %q is incorrectly formatted\n")
@@ -79,26 +115,7 @@ func (r *registry) Start() {
 			r.serviceMap[name] = append(r.serviceMap[name], entry)
 			r.servicesMu.Unlock()
 		}
-		// now start the server.
-		err := r.srv.ListenAndServe()
-		if err != http.ErrServerClosed {
-			r.logger.Fatal(err)
-		}
-		r.quitChan <- struct{}{}
-	}()
-
-	// Start the lookup
-	err := mdns.Lookup("stream_publisher._tcp", entriesCh)
-	if err != nil {
-		r.logger.Fatal(err)
 	}
-
-	err = mdns.Lookup("proxy_cache._tcp", entriesCh)
-	if err != nil {
-		r.logger.Fatal(err)
-	}
-
-	close(entriesCh)
 }
 
 // Stop the registry.
@@ -110,6 +127,45 @@ func (r *registry) Stop() {
 	}
 	cancel()
 
-	// Wait for the http server to finish
+	// Wait for the http server to finish.
 	<-r.quitChan
+	r.logger.Println("Done with http server")
+
+	// Exiting the query loop.
+	r.queryDoneChan <- struct{}{}
+	<-r.quitChan
+
+	// Close the entries chan.
+	r.logger.Println("Closing the entries chan")
+	close(r.entriesChan)
+}
+
+func (r *registry) lookupServices() {
+	// Start the lookup
+	err := mdns.Lookup("stream_publisher._tcp", r.entriesChan)
+	if err != nil {
+		r.logger.Fatal(err)
+	}
+
+	err = mdns.Lookup("proxy_cache._tcp", r.entriesChan)
+	if err != nil {
+		r.logger.Fatal(err)
+	}
+}
+
+func (r *registry) queryLoop() {
+	ticker := time.NewTicker(r.queryInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-r.queryDoneChan:
+			r.logger.Println("Exiting from query loop")
+			r.quitChan <- struct{}{}
+			return
+		case <-ticker.C:
+			r.logger.Println("Refreshing service list")
+			r.resetServiceMapChan <- struct{}{}
+			r.lookupServices()
+		}
+	}
 }
