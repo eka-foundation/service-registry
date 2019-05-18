@@ -20,6 +20,7 @@ type registry struct {
 	srv                  *http.Server
 	streamTmpl, homeTmpl *template.Template
 	logger               *log.Logger
+	quitChan             chan struct{}
 }
 
 // NewRegistry returns a new registry instance.
@@ -52,6 +53,7 @@ func NewRegistry(dir, host, port string, logger *log.Logger) *registry {
 		streamTmpl: stmpl,
 		homeTmpl:   htmpl,
 		logger:     logger,
+		quitChan:   make(chan struct{}),
 	}
 
 	mux.Handle("/static/", fs)
@@ -82,6 +84,7 @@ func (r *registry) Start() {
 		if err != http.ErrServerClosed {
 			r.logger.Fatal(err)
 		}
+		r.quitChan <- struct{}{}
 	}()
 
 	// Start the lookup
@@ -106,4 +109,7 @@ func (r *registry) Stop() {
 		r.logger.Println(err)
 	}
 	cancel()
+
+	// Wait for the http server to finish
+	<-r.quitChan
 }
