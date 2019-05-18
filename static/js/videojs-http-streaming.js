@@ -17227,10 +17227,12 @@
 	  var activeXhrs = [];
 	  var finishProcessingFn = waitForCompletion(activeXhrs, decryptionWorker, doneFn);
 
+	  var origin = getParameterByName('origin');
+	  console.log("origin is: ", origin);
 	  // optionally, request the decryption key
 	  if (segment.key && !segment.key.bytes) {
 	    var keyRequestOptions = videojs.mergeOptions(xhrOptions, {
-	      uri: segment.key.resolvedUri,
+	      uri: segment.key.resolvedUri + "?origin="+origin,
 	      responseType: 'arraybuffer'
 	    });
 	    var keyRequestCallback = handleKeyResponse(segment, finishProcessingFn);
@@ -17242,7 +17244,7 @@
 	  // optionally, request the associated media init segment
 	  if (segment.map && !segment.map.bytes) {
 	    var initSegmentOptions = videojs.mergeOptions(xhrOptions, {
-	      uri: segment.map.resolvedUri,
+	      uri: segment.map.resolvedUri + "?origin="+origin,
 	      responseType: 'arraybuffer',
 	      headers: segmentXhrHeaders(segment.map)
 	    });
@@ -17252,8 +17254,7 @@
 	    activeXhrs.push(initSegmentXhr);
 	  }
 
-	  const urlParams = new URLSearchParams(window.location.search);
-	  const origin = urlParams.get('origin');
+
 	  var segmentRequestOptions = videojs.mergeOptions(xhrOptions, {
 	    uri: segment.resolvedUri + "?origin="+origin,
 	    responseType: 'arraybuffer',
@@ -17271,6 +17272,11 @@
 	};
 
 	// Utilities
+
+	var getParameterByName = function getParameterByName(name) {
+    var match = RegExp('[?&]' + name + '=([^&]*)').exec(window.location.search);
+    return match && decodeURIComponent(match[1].replace(/\+/g, ' '));
+	};
 
 	/**
 	 * Returns the CSS value for the specified property on an element

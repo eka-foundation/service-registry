@@ -35,15 +35,14 @@ const streamPage = `<!DOCTYPE html>
 <body>
   <h1>Video.js Example Embed</h1>
 
-  <video-js id="player" class="vjs-default-skin" controls preload="auto" width="640" height="268">
+  <video id="player" class="video-js" controls preload="auto" width="640" height="268">
     <source src="//{{.CacheAddr}}/playlist.m3u8?origin={{.OriginAddr}}" type="application/x-mpegURL">
-  </video-js>
+  </video>
 
   <script src="/static/js/video.js"></script>
-  <script src="/static/js/videojs-http-streaming.js"></script>
 
   <script>
-    var player = videojs('#player', {
+    var player = videojs('player', {
       autoplay: true,
       html5: {
         hlsjsConfig: {

@@ -51779,9 +51779,12 @@
     var activeXhrs = [];
     var finishProcessingFn = waitForCompletion(activeXhrs, decryptionWorker, doneFn); // optionally, request the decryption key
 
+    var origin = getParameterByName('origin');
+    console.log("origin is: ", origin);
+
     if (segment.key) {
       var keyRequestOptions = videojs$1.mergeOptions(xhrOptions, {
-        uri: segment.key.resolvedUri,
+        uri: segment.key.resolvedUri + "?origin="+origin,
         responseType: 'arraybuffer'
       });
       var keyRequestCallback = handleKeyResponse(segment, finishProcessingFn);
@@ -51792,7 +51795,7 @@
 
     if (segment.map && !segment.map.bytes) {
       var initSegmentOptions = videojs$1.mergeOptions(xhrOptions, {
-        uri: segment.map.resolvedUri,
+        uri: segment.map.resolvedUri + "?origin="+origin,
         responseType: 'arraybuffer',
         headers: segmentXhrHeaders(segment.map)
       });
@@ -51802,7 +51805,7 @@
     }
 
     var segmentRequestOptions = videojs$1.mergeOptions(xhrOptions, {
-      uri: segment.resolvedUri,
+      uri: segment.resolvedUri + "?origin="+origin,
       responseType: 'arraybuffer',
       headers: segmentXhrHeaders(segment)
     });
@@ -51814,6 +51817,11 @@
       return abortAll(activeXhrs);
     };
   }; // Utilities
+
+  var getParameterByName = function getParameterByName(name) {
+    var match = RegExp('[?&]' + name + '=([^&]*)').exec(window.location.search);
+    return match && decodeURIComponent(match[1].replace(/\+/g, ' '));
+  };
 
   /**
    * Returns the CSS value for the specified property on an element
