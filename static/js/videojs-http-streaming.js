@@ -17252,8 +17252,10 @@
 	    activeXhrs.push(initSegmentXhr);
 	  }
 
+	  const urlParams = new URLSearchParams(window.location.search);
+	  const origin = urlParams.get('origin');
 	  var segmentRequestOptions = videojs.mergeOptions(xhrOptions, {
-	    uri: segment.resolvedUri,
+	    uri: segment.resolvedUri + "?origin="+origin,
 	    responseType: 'arraybuffer',
 	    headers: segmentXhrHeaders(segment)
 	  });
