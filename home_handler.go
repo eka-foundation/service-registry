@@ -3,6 +3,7 @@ package main
 import (
 	"net"
 	"net/http"
+	"strings"
 )
 
 func (r *registry) homeHandler(w http.ResponseWriter, req *http.Request) {
@@ -14,26 +15,37 @@ func (r *registry) homeHandler(w http.ResponseWriter, req *http.Request) {
 	}
 	// We construct the data to be shown in the web page
 	type item struct {
-		OriginHost net.IP
-		OriginPort int
-		CacheHost  net.IP
-		CachePort  int
-		OriginName string
-		CacheName  string
+		OriginHost   net.IP
+		OriginPort   int
+		CacheHost    net.IP
+		CachePort    int
+		OriginName   string
+		OriginPrefix string
+		CacheName    string
 	}
 	ctx := []item{}
 	r.servicesMu.RLock()
 	// for every origin
 	for _, oSvc := range r.serviceMap["stream_publisher._tcp"] {
+		// XXX: (agnivade)- improve this logic later by sending the metadata
+		// in 2 separate items
+		streamMetadata := strings.Split(oSvc.Info, "_")
+		if len(streamMetadata) < 2 {
+			r.logger.Println("malformed stream publisher info: ", oSvc.Info)
+			continue
+		}
+		originName := streamMetadata[0]
+		prefix := streamMetadata[1]
 		// for every cache
 		for _, cSvc := range r.serviceMap["proxy_cache._tcp"] {
 			ctx = append(ctx, item{
-				OriginHost: oSvc.AddrV4,
-				OriginPort: oSvc.Port,
-				CacheHost:  cSvc.AddrV4,
-				CachePort:  cSvc.Port,
-				OriginName: oSvc.Info,
-				CacheName:  cSvc.Info,
+				OriginHost:   oSvc.AddrV4,
+				OriginPort:   oSvc.Port,
+				CacheHost:    cSvc.AddrV4,
+				CachePort:    cSvc.Port,
+				OriginName:   originName,
+				OriginPrefix: prefix,
+				CacheName:    cSvc.Info,
 			})
 		}
 	}
@@ -58,7 +70,7 @@ const homePage = `<!DOCTYPE html>
   <p>
   <h3>Live streams available right now:</h3>
   {{range $item := .}}
-    <a href="/stream?origin={{.OriginHost}}:{{.OriginPort}}&cache={{.CacheHost}}:{{.CachePort}}">From {{.OriginName}}, cached at {{.CacheName}}</a>
+    <a href="/stream?prefix={{.OriginPrefix}}&cache={{.CacheHost}}:{{.CachePort}}">From {{.OriginName}}, cached at {{.CacheName}}</a>
   {{end}}
   </p>
 </body>

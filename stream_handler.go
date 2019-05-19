@@ -7,15 +7,15 @@ import (
 func (r *registry) streamHandler(w http.ResponseWriter, req *http.Request) {
 	// We construct the data to be shown in the web page
 	type ctx struct {
-		OriginAddr string
-		CacheAddr  string
+		OriginPrefix string
+		CacheAddr    string
 	}
 
 	q := req.URL.Query()
 
 	err := r.streamTmpl.Execute(w, ctx{
-		OriginAddr: q.Get("origin"),
-		CacheAddr:  q.Get("cache"),
+		OriginPrefix: q.Get("prefix"),
+		CacheAddr:    q.Get("cache"),
 	})
 	if err != nil {
 		r.logger.Println(err)
@@ -36,7 +36,7 @@ const streamPage = `<!DOCTYPE html>
   <h1>Video.js Example Embed</h1>
 
   <video id="player" class="video-js" controls preload="auto" width="640" height="268">
-    <source src="//{{.CacheAddr}}/playlist.m3u8?origin={{.OriginAddr}}" type="application/x-mpegURL">
+    <source src="//{{.CacheAddr}}/{{.OriginPrefix}}_playlist.m3u8" type="application/x-mpegURL">
   </video>
 
   <script src="/static/js/video.js"></script>
