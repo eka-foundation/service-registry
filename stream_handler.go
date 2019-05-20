@@ -36,25 +36,24 @@ const streamPage = `<!DOCTYPE html>
   <h1>Video.js Example Embed</h1>
 
   <video id="player" class="video-js" controls preload="auto" width="640" height="268">
-    <source src="//{{.CacheAddr}}/{{.OriginPrefix}}_playlist.m3u8" type="application/x-mpegURL">
   </video>
-
   <script src="/static/js/video.js"></script>
 
   <script>
     var player = videojs('player', {
       autoplay: true,
       html5: {
-        hlsjsConfig: {
-          debug: true,
-          // Other hlsjsConfig options provided by hls.js
-          p2pConfig: {
-            logLevel: true,
-            live: false,        // set to true in live mode
-          }
+        nativeAudioTracks: false,
+        nativeVideoTracks: false,
+        hls: {
+          overrideNative: true
         }
       }
     });
+    player.src({
+      src: '//{{.CacheAddr}}/{{.OriginPrefix}}_playlist.m3u8',
+      type: 'application/x-mpegURL'
+    })
   </script>
 </body>
 </html>
