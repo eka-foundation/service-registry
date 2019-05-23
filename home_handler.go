@@ -70,7 +70,13 @@ const homePage = `<!DOCTYPE html>
   <p>
   <h3>Live streams available right now:</h3>
   {{range $item := .}}
-    <a href="/stream?prefix={{.OriginPrefix}}&cache={{.CacheHost}}:{{.CachePort}}">From {{.OriginName}}, cached at {{.CacheName}}</a>
+    <a href="/stream?prefix={{.OriginPrefix}}&origin={{.OriginHost}}:{{.OriginPort}}&old=true">[oldjs-pointing to origin]From {{.OriginName}}, cached at {{.CacheName}}</a>
+    <br />
+    <a href="/stream?prefix={{.OriginPrefix}}&cache={{.CacheHost}}:{{.CachePort}}&old=true">[oldjs-pointing to cache]From {{.OriginName}}, cached at {{.CacheName}}</a>
+    <br />
+    <a href="/stream?prefix={{.OriginPrefix}}&origin={{.OriginHost}}:{{.OriginPort}}&old=false">[newjs-pointing to origin]From {{.OriginName}}, cached at {{.CacheName}}</a>
+    <br />
+    <a href="/stream?prefix={{.OriginPrefix}}&cache={{.CacheHost}}:{{.CachePort}}&old=false">[newjs-pointing to cache]From {{.OriginName}}, cached at {{.CacheName}}</a>
   {{end}}
   </p>
 </body>
